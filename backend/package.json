@@ -1,0 +1,22 @@
+{
+  "name": "personal-gemini-journal-backend",
+  "version": "1.0.0",
+  "description": "Express backend for Personal Gemini Journal",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@google-cloud/secret-manager": "^5.0.0",
+    "@google/genai": "latest",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "firebase-admin": "^12.0.0",
+    "helmet": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

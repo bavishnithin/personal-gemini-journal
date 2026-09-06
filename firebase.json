@@ -1,0 +1,32 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": "frontend/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Personal Gemini Journal",
+        "supportEmail": "support@example.com",
+        "authorizedRedirectUris": [
+          "http://localhost",
+          "https://your-project.firebaseapp.com"
+        ]
+      }
+    }
+  }
+}

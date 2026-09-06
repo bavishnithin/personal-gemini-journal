@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ================================================================
+    // DEFAULT DENY — no access unless explicitly granted below.
+    // This is the single most important rule: it ensures that any
+    // collection or document path not covered by a rule below is
+    // completely inaccessible, even to authenticated users.
+    // ================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ================================================================
+    // HELPER FUNCTIONS
+    // ================================================================
+
+    // Returns true only when the request comes from a signed-in user.
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Returns true when the authenticated user's UID matches the
+    // {userId} path segment — this is the core isolation check.
+    // WHY THIS PREVENTS CROSS-USER LEAKAGE:
+    //   The userId is a path wildcard, not a client-supplied field.
+    //   Firebase Auth sets request.auth.uid from the verified ID token,
+    //   so a malicious client cannot forge it. A user can only match
+    //   their own path segment.
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validates that an entry document has the required shape.
+    function isValidEntry(data) {
+      return data.keys().hasAll(['text', 'createdAt'])
+          && data.text is string
+          && data.text.size() > 0
+          && data.text.size() <= 50000;
+    }
+
+    // Validates that createdAt was not tampered with on update.
+    function createdAtUnchanged() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // ================================================================
+    // USER PROFILE DOCUMENT
+    // Path: /users/{userId}
+    // ================================================================
+    match /users/{userId} {
+      // Only the owning user can read or write their own profile doc.
+      // WHY: prevents any user from reading another user's profile.
+      allow read, write: if isOwner(userId);
+
+      // ==============================================================
+      // JOURNAL ENTRIES
+      // Path: /users/{userId}/entries/{entryId}
+      // ==============================================================
+      match /entries/{entryId} {
+        // READ & DELETE: owner only.
+        // WHY: a user can only list/read/delete their own entries.
+        allow read, delete: if isOwner(userId);
+
+        // CREATE: owner + valid shape.
+        // WHY: ensures entries are only created under the user's own
+        // path, and validates the document schema to prevent abuse
+        // (e.g., storing arbitrarily large blobs or missing fields).
+        allow create: if isOwner(userId)
+                      && isValidEntry(request.resource.data);
+
+        // UPDATE: owner + valid shape + immutable createdAt.
+        // WHY: prevents a client from backdating entries or changing
+        // the creation timestamp to mess with ordering/trends.
+        allow update: if isOwner(userId)
+                      && isValidEntry(request.resource.data)
+                      && createdAtUnchanged();
+      }
+
+      // ==============================================================
+      // CACHED DAILY PROMPTS (Feature B)
+      // Path: /users/{userId}/dailyPrompts/{date}
+      // ==============================================================
+      match /dailyPrompts/{date} {
+        // Only the owning user can read or write their cached prompts.
+        // WHY: daily prompts are derived from a user's private entries,
+        // so leaking them to another user leaks private context.
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
